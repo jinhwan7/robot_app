@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "557168947686",
+    "project_id": "robot-f3cf9",
+    "storage_bucket": "robot-f3cf9.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:557168947686:android:d348a1e11d1bbae03d6627",
+        "android_client_info": {
+          "package_name": "com.robotapp.robot_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8GT11xyrXZzp_SZWACwxsz7ppa1ebk-w"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
