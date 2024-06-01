@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:robot_app/src/ble.dart';
+import 'package:robot_app/src/blue_tooth_classic.dart';
+import 'package:robot_app/src/map.dart';
 import 'package:robot_app/src/provider/bluetooth_provider.dart';
+import 'package:robot_app/src/stt/simple_stt.dart';
+import 'package:robot_app/src/stt/speach_to_text.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class HomeBodyWidget extends StatefulWidget {
@@ -23,7 +27,7 @@ class _HomeBodyWidgetState extends State<HomeBodyWidget> {
   @override
   Widget build(BuildContext context) {
     var a = Provider.of<BlueToothProvider>(context);
-    print('home_body까지 빌드됨 : $a');
+
     // Provider.of<BlueToothProvider>(context);
     return Center(
         child: Column(
@@ -56,22 +60,41 @@ class _HomeBodyWidgetState extends State<HomeBodyWidget> {
             // Implement Map Viewer
             child: const Text('Map',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => MapWidget()));
+            },
           ),
           ElevatedButton(
             child: const Text('Camera',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
             onPressed: () {},
           ),
-          ElevatedButton(
-              child: const Text('blueTooth',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-              onPressed: () {
-                Navigator.push(
-                    context,
-                    // MaterialPageRoute(builder: (context) => BleScan())
-                    MaterialPageRoute(builder: (context) => BleScan()));
-              })
+          // ElevatedButton(
+          //   child: const Text('speach_to_text',
+          //       style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+          //   onPressed: () {
+          //     Navigator.push(context,
+          //         MaterialPageRoute(builder: (context) => Stt()));
+          //   },
+          // ),
+          // ElevatedButton(
+          //   child: const Text('bluetoothSerial',
+          //       style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+          //   onPressed: () {
+          //     Navigator.push(context,
+          //         MaterialPageRoute(builder: (context) => BluetoothSereial()));
+          //   },
+          // ),
+          // ElevatedButton(
+          //     child: const Text('blueTooth',
+          //         style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+          //     onPressed: () {
+          //       Navigator.push(
+          //           context,
+          //           // MaterialPageRoute(builder: (context) => BleScan())
+          //           MaterialPageRoute(builder: (context) => BleScan()));
+          //     })
         ]));
   }
 

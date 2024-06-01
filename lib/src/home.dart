@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_blue/flutter_blue.dart';
+// import 'package:flutter_blue/flutter_blue.dart';
 import 'package:provider/provider.dart';
 import 'package:robot_app/src/provider/bluetooth_provider.dart';
 import 'package:robot_app/src/ui/home_body.dart';
@@ -12,7 +12,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<BluetoothService> bleService = [];
+  // List<BluetoothService> bleService = [];
   Color color = Colors.red;
   bool isConnected = false;
 
@@ -30,11 +30,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    bleService = Provider.of<BlueToothProvider>(context).connectedService;
-    print('나와라 $bleService');
-    if (bleService.isNotEmpty) {
-      color = Colors.green;
-    }
+    // bleService = Provider.of<BlueToothProvider>(context).connectedService;
+    print('나와라');
+    // if (bleService.isNotEmpty) {
+    //   color = Colors.green;
+    // }
     return Scaffold(
         appBar: AppBar(
           title: Text('ROS Integration App'),
