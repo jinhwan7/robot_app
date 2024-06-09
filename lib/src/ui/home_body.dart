@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:robot_app/src/ble.dart';
-import 'package:robot_app/src/blue_tooth_classic.dart';
+
+// import 'package:robot_app/src/ble.dart';
+// import 'package:robot_app/src/blue_tooth_classic.dart';
+import 'package:robot_app/src/compass.dart';
 import 'package:robot_app/src/map.dart';
 import 'package:robot_app/src/provider/bluetooth_provider.dart';
 import 'package:robot_app/src/stt/simple_stt.dart';
@@ -26,9 +28,6 @@ class _HomeBodyWidgetState extends State<HomeBodyWidget> {
 
   @override
   Widget build(BuildContext context) {
-    var a = Provider.of<BlueToothProvider>(context);
-
-    // Provider.of<BlueToothProvider>(context);
     return Center(
         child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -70,31 +69,6 @@ class _HomeBodyWidgetState extends State<HomeBodyWidget> {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
             onPressed: () {},
           ),
-          // ElevatedButton(
-          //   child: const Text('speach_to_text',
-          //       style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-          //   onPressed: () {
-          //     Navigator.push(context,
-          //         MaterialPageRoute(builder: (context) => Stt()));
-          //   },
-          // ),
-          // ElevatedButton(
-          //   child: const Text('bluetoothSerial',
-          //       style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-          //   onPressed: () {
-          //     Navigator.push(context,
-          //         MaterialPageRoute(builder: (context) => BluetoothSereial()));
-          //   },
-          // ),
-          // ElevatedButton(
-          //     child: const Text('blueTooth',
-          //         style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-          //     onPressed: () {
-          //       Navigator.push(
-          //           context,
-          //           // MaterialPageRoute(builder: (context) => BleScan())
-          //           MaterialPageRoute(builder: (context) => BleScan()));
-          //     })
         ]));
   }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:provider/provider.dart';
+import 'package:robot_app/src/getX/infoclass.dart';
 import 'package:robot_app/src/home.dart';
 import 'package:robot_app/src/provider/bluetooth_provider.dart';
 
@@ -12,6 +14,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Get.put(INFOCLASS());
     return ChangeNotifierProvider(
       create: (BuildContext context) {
         return BlueToothProvider();

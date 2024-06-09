@@ -1,15 +1,9 @@
 package com.robotapp.robot_app
 
-import android.Manifest
-import android.app.Activity
+
 import android.content.Context
-import android.content.pm.PackageManager
-import androidx.core.app.ActivityCompat
 import android.util.Log
 import android.view.View
-import androidx.core.content.ContextCompat
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
 import com.skt.tmap.TMapView
 import io.flutter.plugin.common.StandardMessageCodec
 import io.flutter.plugin.platform.PlatformView
@@ -29,7 +23,6 @@ class TMapViewFactory(private val tMapView: TMapView) :
 //            override fun onMapReady() {
 //                Log.d("TMapViewFactory", "TMapView is ready")
 //                // 여기에 맵 로딩이 완료된 후 수행할 작업을 구현합니다.
-//
 //            }
 //        })
 
@@ -40,6 +33,7 @@ class TMapViewFactory(private val tMapView: TMapView) :
 
 class TMapViewPlatformView(private val view: View) : PlatformView {
     override fun getView(): View {
+//        Log.d("TMapView_GETVIEW", "이게 몇번 나오나?")
         return view
     }
 

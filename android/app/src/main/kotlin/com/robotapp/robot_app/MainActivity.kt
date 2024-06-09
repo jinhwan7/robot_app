@@ -1,13 +1,13 @@
 package com.robotapp.robot_app
 
-//import okhttp3.*
 
-//import android.R
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory;
+import android.graphics.BitmapFactory
 import android.util.Log
+import com.skt.tmap.TMapPoint
 import com.skt.tmap.TMapView
 import com.skt.tmap.overlay.TMapMarkerItem
+import com.skt.tmap.overlay.TMapMarkerItem2
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -16,8 +16,10 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.robotapp.robot_app/tmap"
     private lateinit var tMapView: TMapView
-
-//    private val client = OkHttpClient()
+    private lateinit var tmapStartMarker: TMapMarkerItem
+    private lateinit var tmapEndMarker: TMapMarkerItem
+    private lateinit var startBitmap: Bitmap
+    private lateinit var endBitmap: Bitmap
 
 //    override fun onCreate(savedInstanceState: Bundle?) {
 //        super.onCreate(savedInstanceState)
@@ -30,9 +32,21 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         tMapView = TMapView(this)
 
+        tmapStartMarker = TMapMarkerItem()
+        tmapStartMarker.setId("startPoint")
+
+        tmapEndMarker = TMapMarkerItem()
+        tmapEndMarker.setId("endPoint")
+
+        startBitmap = BitmapFactory.decodeResource(
+            context.resources, R.drawable.start
+        )
+
+        endBitmap = BitmapFactory.decodeResource(
+            context.resources, R.drawable.end
+        )
         MethodChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            CHANNEL
+            flutterEngine.dartExecutor.binaryMessenger, CHANNEL
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "initializeTMap" -> {
@@ -49,9 +63,8 @@ class MainActivity : FlutterActivity() {
                     val latitude = call.argument<Double>("latitude")
                     val longitude = call.argument<Double>("longitude")
 
-//                    Log.d("markCurrentPosition","$longitude")
                     if (latitude != null && longitude != null) {
-                        markCurrentPosition(latitude, longitude)
+                        markCurrentPosition(tmapStartMarker, latitude, longitude, startBitmap)
                         result.success("Current position marked")
                     } else {
                         result.error("UNAVAILABLE", "Position data not available.", null)
@@ -60,28 +73,39 @@ class MainActivity : FlutterActivity() {
 
                 }
 
-//                "showMap" -> {
-//                    showMap()
-//                    result.success("Map displayed")
-//                }
+                "drawDestinationPath" -> {
+                    Log.d("coordinates", "여기까진 나옴?11")
+                    val latitude = call.argument<Double>("latitude")
+                    val longitude = call.argument<Double>("longitude")
+                    val destination: Destination? = call.argument<Destination>("destination")
+                    //destinaiton에서 경도 위도 꺼내기
 
-//                "findPedestrianRoute" -> {
-//                    val startX = call.argument<Double>("startX") ?: 0.0
-//                    val startY = call.argument<Double>("startY") ?: 0.0
-//                    val endX = call.argument<Double>("endX") ?: 0.0
-//                    val endY = call.argument<Double>("endY") ?: 0.0
-//                    findPedestrianRoute(startX, startY, endX, endY, result)
-//                }
+                    Log.d("coordinates", destination.toString())
+
+                    if (latitude != null && longitude != null) {
+
+//                        val endLon = destination.features.last().geometry.coordinates[0]
+//                        val endLat = destination.features.last().geometry.coordinates[1]
+                        Log.d("coordinates", "${longitude}, ${latitude}")
+                        markPosition(tmapEndMarker, latitude, longitude, endBitmap)
+//                        drawRoute()
+                        result.success("destinaitonPath draw success")
+                    } else {
+                        result.error("UNAVAILABLE", "Position data not available.", null)
+                    }
+
+
+                }
+
 
                 else -> {
                     result.notImplemented()
                 }
             }
         }
-        flutterEngine
-            .platformViewsController
-            .registry
-            .registerViewFactory("tmap-view", TMapViewFactory(tMapView))
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            "tmap-view", TMapViewFactory(tMapView)
+        )
 
     }
 
@@ -95,33 +119,29 @@ class MainActivity : FlutterActivity() {
 
     }
 
-    private fun markCurrentPosition(latitude: Double, longitude: Double) {
-        val tItem = TMapMarkerItem()
 
-        tItem.setId("marker1")
+    private fun markCurrentPosition(
+        tMapStartItem: TMapMarkerItem, latitude: Double, longitude: Double, bitmap: Bitmap
+    ) {
+        tMapView.setCenterPoint(latitude, longitude, true)
+        tMapView.removeTMapMarkerItem(tMapStartItem.id)
+        markPosition(tMapStartItem, latitude, longitude, bitmap)
+    }
 
-        val bitmap: Bitmap = BitmapFactory.decodeResource(context.getResources(), R.drawable.point)
+    private fun markPosition(
+        tItem: TMapMarkerItem, latitude: Double, longitude: Double, bitmap: Bitmap
+    ) {
+        val tMapPoint1 = TMapPoint(latitude, longitude)
+
         tItem.setIcon(bitmap)
-        tItem.setTMapPoint(latitude, longitude)
+        tItem.setTMapPoint(tMapPoint1)
 
 
         tMapView.addTMapMarkerItem(tItem)
-        tMapView.setCenterPoint(latitude, longitude, true)
 
-//        val tMapPoint = TMapPoint(latitude, longitude)
-//        val markerItem = TMapMarkerItem()
-//        markerItem.tMapPoint = tMapPoint
-//        markerItem.name = "Current Location"
     }
-//    private fun showMap() {
-//        // TMapView 초기화 및 표시
-//        runOnUiThread {
-//            tMapView = TMapView(this)
-//            tMapView.setSKTMapApiKey("YOUR_TMAP_API_KEY")
-//            setContentView(tMapView)
-//        }
-//    }
-//    private fun findPedestrianRoute(startX: Double, startY: Double, endX: Double, endY: Double, result: MethodChannel.Result) {
+
+    //    private fun findPedestrianRoute(startX: Double, startY: Double, endX: Double, endY: Double, result: MethodChannel.Result) {
 //        val url = "https://apis.openapi.sk.com/tmap/routes/pedestrian?version=1&format=json"
 //
 //        val json = JSONObject()
@@ -169,6 +189,7 @@ class MainActivity : FlutterActivity() {
 //    }
 //
 //    private fun drawRoute(features: JSONArray) {
+    private fun drawRoute() {
 //        val path = ArrayList<TMapPoint>()
 //
 //        for (i in 0 until features.length()) {
@@ -189,6 +210,5 @@ class MainActivity : FlutterActivity() {
 //        polyline.addLinePoint(path)
 //
 //        tMapView.addTMapPolyLine("Line1", polyline)
-//    }
-//}
+    }
 }

@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:ffi';
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
@@ -8,9 +8,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:get/get.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:robot_app/src/getX/infoclass.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_tts/flutter_tts.dart';
 
 class MapWidget extends StatefulWidget {
   const MapWidget({super.key});
@@ -20,6 +25,9 @@ class MapWidget extends StatefulWidget {
 }
 
 class _MapWidgetState extends State<MapWidget> {
+  final infoClass = Get.find<INFOCLASS>();
+  final FlutterTts tts = FlutterTts();
+
   //stt,tts관련
   bool _hasSpeech = false;
   final bool _logEvents = true;
@@ -29,23 +37,47 @@ class _MapWidgetState extends State<MapWidget> {
   String lastWords = '';
   String lastError = '';
   String lastStatus = '';
+  bool sttFinal = false;
   String _currentLocaleId = '';
   List<LocaleName> _localeNames = [];
   final SpeechToText speech = SpeechToText();
 
+  final TextEditingController _controller = TextEditingController();
+
+  //지도관련 멤버변수
   static const platform = MethodChannel('com.robotapp.robot_app/tmap');
+  Map<String, String> tmapReqHeaders = {
+    'appKey': 'G47hiGFOOG1mZzstLLeHP342E38U3AT92zGGgq6Q'
+  };
   Position? _currentPosition;
   StreamSubscription<Position>? _positionStreamSubscription;
   late bool serviceEnabled;
   late LocationPermission permission;
 
+  Map<String, dynamic> destinationInfo = {};
+  List<dynamic> pointFeatures = [];
+  int distance = 0;
+  double direction = 0.0;
+  List<double> pointCoordi = [0.0, 0.0];
+  String errorString = '';
+
   @override
   void initState() {
     super.initState();
+    _fetchPermissionStatus();
+    tts.setLanguage('ko-KR');
+    tts.setSpeechRate(0.5);
+    infoClass.setheading();
     isLocationServiceEnabled();
     _startLocationStream();
     initSpeechState();
-    // _initializeTMap(); // 여기서 초기화를 호출합니다.
+  }
+
+  @override
+  void dispose() {
+    // 위젯이 dispose될 때 스트림 구독 취소
+    super.dispose();
+    stopLocationStream();
   }
 
   //////////////////geolocator
@@ -67,8 +99,8 @@ class _MapWidgetState extends State<MapWidget> {
 
   void _startLocationStream() {
     const LocationSettings locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 5,
+      accuracy: LocationAccuracy.best,
+      distanceFilter: 0,
     );
 
     _positionStreamSubscription =
@@ -79,6 +111,7 @@ class _MapWidgetState extends State<MapWidget> {
       double latitude = position.latitude;
       final String result = await platform.invokeMethod('markCurrentPosition',
           {'longitude': longitude, 'latitude': latitude});
+      setState(() {});
     });
   }
 
@@ -86,15 +119,180 @@ class _MapWidgetState extends State<MapWidget> {
     _positionStreamSubscription?.cancel();
   }
 
-  // Future<void> _initializeTMap() async {
-  //   try {
-  //     final String result = await platform.invokeMethod('initializeTMap',
-  //         {'apiKey': 'G47hiGFOOG1mZzstLLeHP342E38U3AT92zGGgq6Q'});
-  //     print(result);
-  //   } on PlatformException catch (e) {
-  //     print("Failed to initialize TMap: '${e.message}'.");
-  //   }
-  // }
+  // 도착지 이름으로 좌표찾기ß
+  Future<Map<String, dynamic>> _findCoordinateByPoi(String lastWords) async {
+    try {
+      var url = Uri.https('apis.openapi.sk.com', '/tmap/pois', {
+        'searchKeyword': lastWords,
+        'searchtypeCd': 'R',
+        'centerLat': '${_currentPosition?.latitude}',
+        'centerLon': '${_currentPosition?.longitude}',
+        // 'centerLat': '37.4722393',
+        // 'centerLon': '126.9371915',
+        'radius': '5',
+        'version': '1',
+        'format': 'json'
+      });
+
+      var response = await http.get(url, headers: tmapReqHeaders);
+
+      // print('respons status ${response.statusCode}');
+      if (response.statusCode == 204) throw '결과 없음';
+
+      var parsedRes = json.decode(utf8.decode(response.bodyBytes));
+
+      var searchedPoi = parsedRes['searchPoiInfo']['pois']['poi'][0];
+      var searchedPoiName = searchedPoi['name'];
+      tts.speak('$searchedPoiName 으로 경로 탐색');
+      Map<String, dynamic> searchedCoordi = {
+        'lat': searchedPoi['frontLat'],
+        'lon': searchedPoi['frontLon'],
+      };
+
+      return searchedCoordi;
+    } catch (e) {
+      if (e == '결과 없음') {
+        tts.speak('결과 없음');
+      }
+
+      return Future.error(e);
+    }
+  }
+
+  double _calculateBearing(var startPoint, var endPoint) {
+    final double startLatRad = _degreeToRadian(startPoint.latitude);
+    final double startLngRad = _degreeToRadian(startPoint.longitude);
+    final double endLatRad = _degreeToRadian(endPoint[1]);
+    final double endLngRad = _degreeToRadian(endPoint[0]);
+
+    final double dLng = endLngRad - startLngRad;
+    final double y = sin(dLng) * cos(endLatRad);
+    final double x = cos(startLatRad) * sin(endLatRad) -
+        sin(startLatRad) * cos(endLatRad) * cos(dLng);
+
+    final double bearingRad = atan2(y, x);
+    final double bearingDeg = _radianToDegree(bearingRad);
+    return (bearingDeg + 360) % 360;
+  }
+
+  double _degreeToRadian(double degree) {
+    return degree * pi / 180;
+  }
+
+  double _radianToDegree(double radian) {
+    return radian * 180 / pi;
+  }
+
+  Future<void> _findPedestrianRoute(Map<String, dynamic> searchedCoordi) async {
+    var url = Uri.https('apis.openapi.sk.com', '/tmap/routes/pedestrian',
+        {'version': '1', 'format': 'json', 'callback': 'result'});
+    var response = await http.post(url,
+        body: {
+          'startX': _currentPosition?.longitude.toString(),
+          'startY': _currentPosition?.latitude.toString(),
+          'endX': searchedCoordi['lon'].toString(),
+          'endY': searchedCoordi['lat'].toString(),
+          // "startX": "126.9371915",
+          // "startY": "37.4722393",
+          // "endX": "126.9356517",
+          // "endY": "37.4722775",
+          "reqCoordType": "WGS84GEO",
+          "resCoordType": "WGS84GEO",
+          "startName": "출발지",
+          "endName": "도착지"
+        },
+        headers: tmapReqHeaders);
+
+    Map<String, dynamic> parsedRes =
+        json.decode(utf8.decode(response.bodyBytes));
+
+    print('Response status: ${response.statusCode}');
+    destinationInfo = parsedRes;
+
+    //경로 그려주기 //도착지 마크찍기, 선그려주기
+
+    pointFeatures = destinationInfo['features'].where((feature) {
+      return feature['geometry']['type'] == 'Point';
+    }).toList();
+
+    await platform.invokeMethod('drawDestinationPath', {
+      'longitude': pointFeatures.last['geometry']['coordinates'][0],
+      'latitude': pointFeatures.last['geometry']['coordinates'][1]
+    });
+
+    startGuidance(pointFeatures);
+  }
+
+  Future<dynamic> carcDistance(var point) async {
+    try {
+      var url = Uri.https('apis.openapi.sk.com', '/tmap/routes/distance', {
+        "startX": "${_currentPosition?.longitude}",
+        "startY": "${_currentPosition?.latitude}",
+        "endX": "${point['geometry']['coordinates'][0]}",
+        "endY": "${point['geometry']['coordinates'][1]}",
+        'version': '1',
+        'format': 'json',
+        'callback': 'result'
+      });
+      var response = await http.get(url, headers: tmapReqHeaders);
+
+      Map<String, dynamic> parsedRes =
+          json.decode(utf8.decode(response.bodyBytes));
+      return parsedRes['distanceInfo']['distance'];
+    } catch (e) {
+      return Future.error(e);
+    }
+  }
+
+  void startGuidance(List<dynamic> points) {
+    int index = 0;
+    Timer.periodic(Duration(seconds: 2), (timer) {
+      if (index >= points.length) {
+        timer.cancel();
+        return;
+      }
+
+      var routePoint = points[index];
+
+      pointCoordi[0] = routePoint['geometry']['coordinates'][0];
+      pointCoordi[1] = routePoint['geometry']['coordinates'][1];
+      double angleToPoint = 0.0;
+      angleToPoint = _calculateBearing(_currentPosition, pointCoordi);
+      direction = angleToPoint;
+      setState(() {});
+      // 비동기로 각 함수 호출
+      carcDistance(routePoint).then((result) {
+        distance = result;
+
+        // tts.speak(distance.toString());
+
+        var angle = infoClass.heading.value;
+        int angleInt = angle > 0 ? angle.toInt() : (360 + angle).toInt();
+        if (angleInt > angleToPoint + 20) {
+          tts.speak(' 약간 좌회전');
+        }
+
+        if (angleInt < angleToPoint - 20) {
+          tts.speak(' 약간 우회전');
+        }
+        ;
+
+        // 거리 값이 1이 되면 다음 포인트로 이동
+        if (distance <= 1) {
+          tts.speak('${index + 1} 지점 도착');
+          index++;
+        }
+        if (index == points.length - 1 && distance <= 1) {
+          tts.speak('목적지에 도착');
+          index++;
+        }
+        setState(() {});
+      }).catchError((err) {
+        errorString = '$err';
+        setState(() {});
+      });
+    });
+  }
 
   /////////////////////Sst
   Future<void> initSpeechState() async {
@@ -119,12 +317,20 @@ class _MapWidgetState extends State<MapWidget> {
     });
   }
 
-  void resultListener(SpeechRecognitionResult result) {
+  void resultListener(SpeechRecognitionResult result) async {
     _logEvent(
         'Result listener final: ${result.finalResult}, words: ${result.recognizedWords}');
+    lastWords = result.recognizedWords;
+    sttFinal = result.finalResult;
+    _controller.text = lastWords;
+
+    if (result.finalResult) {
+      var searchedCoordi = await _findCoordinateByPoi(lastWords);
+      await _findPedestrianRoute(searchedCoordi);
+    }
 
     setState(() {
-      lastWords = result.recognizedWords;
+      // lastWords = result.recognizedWords;
     });
   }
 
@@ -165,8 +371,8 @@ class _MapWidgetState extends State<MapWidget> {
         enableHapticFeedback: true);
     speech.listen(
       onResult: resultListener,
-      listenFor: Duration(seconds: 30),
-      pauseFor: Duration(seconds: 5),
+      listenFor: Duration(seconds: 7),
+      pauseFor: Duration(seconds: 3),
       localeId: _currentLocaleId,
       onSoundLevelChange: soundLevelListener,
       listenOptions: options,
@@ -180,7 +386,32 @@ class _MapWidgetState extends State<MapWidget> {
     }
   }
 
-  void _findPedestrianRoute() {}
+  void _onPlatformViewCreated(int id) {
+    // PlatformView가 생성된 후 호출되는 콜백
+    setState(() {});
+
+    // 특정 로직 실행
+    tts.speak('화면의 하단을 누른 후 도착지를 말씀해 주세요');
+  }
+
+  String getNewAngle(double angle) {
+    return angle > 0
+        ? angle.toInt().toString()
+        : (360 + angle).toInt().toString();
+  }
+
+  void _fetchPermissionStatus() {
+    //권한 확인
+    Permission.locationWhenInUse.status.then((status) {
+      if (mounted) {
+        setState(() =>
+            infoClass.sethasperrmission(status == PermissionStatus.granted));
+        Permission.locationWhenInUse.request().then((status) {
+          infoClass.sethasperrmission(status == PermissionStatus.granted);
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -192,19 +423,16 @@ class _MapWidgetState extends State<MapWidget> {
       ),
       body: Column(
         children: [
+          Text(sttFinal ? 'true' : 'false'),
           Container(
               height: 100,
               color: Colors.white54,
               child: Column(children: [
-                Text(lastWords == '' ? '화면의 하단을 누른 후 도착지를 말씀해 주세요' : lastWords,
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                        color: Colors.purple)),
                 SizedBox(
                   width: 280,
                   child: TextField(
-                    obscureText: true,
+                    controller: _controller,
+                    obscureText: false,
                     decoration: InputDecoration(
                       border: OutlineInputBorder(),
                       labelText: '도착지',
@@ -235,30 +463,43 @@ class _MapWidgetState extends State<MapWidget> {
                         onFocus: () {
                           params.onFocusChanged(true);
                         })
-                      ..addOnPlatformViewCreatedListener(
-                          params.onPlatformViewCreated)
+                      ..addOnPlatformViewCreatedListener((int id) {
+                        params.onPlatformViewCreated(id);
+                        _onPlatformViewCreated(id);
+                      })
                       ..create();
                 return controller;
               },
             ),
-
-            // ElevatedButton(
-            //   onPressed: _findPedestrianRoute,
-            //   child: Text('Find Pedestrian Route'),
-            // ),
           ),
           Expanded(
-            child: Container(
-              child: Center(
-                child: IconButton(
-                  onPressed:
-                      !_hasSpeech || speech.isListening ? null : startListening,
-                  icon: const Icon(Icons.mic),
-                  iconSize: 60,
+            child: InkWell(
+              onTap: !_hasSpeech || speech.isListening ? null : startListening,
+              child: Container(
+                child: Center(
+                  child: Icon(
+                    Icons.mic,
+                    size: 60,
+                  ),
                 ),
               ),
             ),
           ),
+          Container(
+            child: Column(
+              children: [
+                Obx(() => Text(getNewAngle(infoClass.heading.value))),
+                Text('angleToPoint ${direction}'),
+                Text(errorString != ''
+                    ? errorString
+                    : 'point까지 남은 거리: ${distance}'),
+                Text('point의 좌표: ${pointCoordi[0]},${pointCoordi[1]}'),
+                Text(_currentPosition != null
+                    ? '현재위치 ${_currentPosition?.latitude}, ${_currentPosition?.longitude}'
+                    : 'null')
+              ],
+            ),
+          )
         ],
       ),
     );
